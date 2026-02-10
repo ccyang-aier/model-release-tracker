@@ -1,37 +1,25 @@
-import os
-import sys
-import tempfile
-import unittest
+from mrt.state.sqlite_store import SqliteStateStore
 
 
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "src")))
+def test_seen_dedupe(tmp_path) -> None:  # noqa: ANN001
+    db = tmp_path / "state.sqlite3"
+    store = SqliteStateStore(str(db))
+    store.ensure_schema()
+
+    fp = "abc"
+    assert store.has_seen(fp) is False
+    store.mark_seen(fp)
+    assert store.has_seen(fp) is True
+
+    store.mark_seen(fp)
+    assert store.has_seen(fp) is True
 
 
-from mrt.state.sqlite_store import SqliteStateStore  # noqa: E402
+def test_cursor_roundtrip(tmp_path) -> None:  # noqa: ANN001
+    db = tmp_path / "state.sqlite3"
+    store = SqliteStateStore(str(db))
+    store.ensure_schema()
 
-
-class TestSqliteStateStore(unittest.TestCase):
-    def test_seen_dedupe(self) -> None:
-        with tempfile.TemporaryDirectory() as td:
-            db = os.path.join(td, "state.sqlite3")
-            store = SqliteStateStore(db)
-            store.ensure_schema()
-
-            fp = "abc"
-            self.assertFalse(store.has_seen(fp))
-            store.mark_seen(fp)
-            self.assertTrue(store.has_seen(fp))
-
-            store.mark_seen(fp)
-            self.assertTrue(store.has_seen(fp))
-
-    def test_cursor_roundtrip(self) -> None:
-        with tempfile.TemporaryDirectory() as td:
-            db = os.path.join(td, "state.sqlite3")
-            store = SqliteStateStore(db)
-            store.ensure_schema()
-
-            self.assertIsNone(store.get_cursor("s1"))
-            store.set_cursor("s1", '{"x":1}')
-            self.assertEqual(store.get_cursor("s1"), '{"x":1}')
-
+    assert store.get_cursor("s1") is None
+    store.set_cursor("s1", '{"x":1}')
+    assert store.get_cursor("s1") == '{"x":1}'

@@ -1,27 +1,23 @@
 import json
-import os
 import socket
 import sqlite3
-import sys
 import tempfile
 import threading
 import time
-import unittest
 import urllib.parse
-import urllib.error
 from dataclasses import dataclass
 from http.server import BaseHTTPRequestHandler, HTTPServer
+from typing import Any
 
+import pytest
 
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "src")))
-
-
-from mrt.http_utils import HttpClient  # noqa: E402
-from mrt.notify.welink import WeLinkNotifier  # noqa: E402
-from mrt.rules.matcher import RuleMatcher  # noqa: E402
-from mrt.runner import Runner  # noqa: E402
-from mrt.sources.huggingface import HuggingFaceOrgModelsSource  # noqa: E402
-from mrt.state.sqlite_store import SqliteStateStore  # noqa: E402
+from mrt.http_utils import HttpClient
+from mrt.notify.welink import WeLinkNotifier
+from mrt.rules.matcher import RuleMatcher
+from mrt.runner import Runner
+from mrt.sources.base import PollResult
+from mrt.sources.huggingface import HuggingFaceOrgModelsSource
+from mrt.state.sqlite_store import SqliteStateStore
 
 
 def _find_free_port() -> int:
@@ -44,10 +40,9 @@ class _TruncatingSource:
     def key(self) -> str:
         return self.inner.key()
 
-    def poll(self, cursor: str | None):  # noqa: ANN001
+    def poll(self, cursor: str | None) -> PollResult:
         result = self.inner.poll(cursor)
-        result.events = result.events[: self.max_events]
-        return result
+        return PollResult(events=result.events[: self.max_events], new_cursor=result.new_cursor)
 
 
 class _CaptureState:
@@ -134,91 +129,89 @@ class _WeLinkHandler(BaseHTTPRequestHandler):
         return
 
 
-@unittest.skipUnless(
-    os.environ.get("MRT_RUN_LIVE_TESTS") == "1",
-    "Skip live integration tests unless MRT_RUN_LIVE_TESTS=1",
-)
-class TestLiveE2EHuggingFaceToLocalWeLink(unittest.TestCase):
+@pytest.fixture()
+def local_welink_server() -> dict[str, Any]:
     """
-    真实端到端集成测试（联网 + 下游 HTTP POST）：
+    本地模拟 WeLink webhook server（真实 HTTP server）。
 
-    - 上游：真实访问 HuggingFace Hub API
-    - 归一：生成 TrackerEvent
-    - 规则：关键词匹配（deepseek）
-    - 幂等：SQLite state（cursor / seen / alerts）
-    - 下游：真实 HTTP POST 到本地模拟 WeLink webhook server
-
-    运行方式：
-      MRT_RUN_LIVE_TESTS=1 python -m unittest -v tests.integration.test_live_e2e_huggingface_to_local_welink
+    Runner 会发起真实 HTTP POST 到该 server：
+    - query 必须包含 token 与 channel
+    - body 必须包含 messageType/content/timeStamp/uuid 等关键字段
+    - content.text 必须满足 1~500 长度约束
+    - timeStamp 必须在 10 分钟内（模拟 WeLink 有效期校验）
     """
+    capture = _CaptureState()
 
-    def test_live_poll_generates_events_and_posts_to_welink(self) -> None:
-        capture = _CaptureState()
+    port = _find_free_port()
+    handler = type("Handler", (_WeLinkHandler,), {"capture": capture})
+    server = HTTPServer(("127.0.0.1", port), handler)
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
 
-        port = _find_free_port()
-        handler = type("Handler", (_WeLinkHandler,), {"capture": capture})
-        server = HTTPServer(("127.0.0.1", port), handler)
-        thread = threading.Thread(target=server.serve_forever, daemon=True)
-        thread.start()
+    url = f"http://127.0.0.1:{port}/api/werobot/v1/webhook/send?token=test&channel=standard"
+    try:
+        yield {"url": url, "capture": capture}
+    finally:
+        server.shutdown()
+        server.server_close()
 
+
+def test_live_poll_generates_events_and_posts_to_welink(local_welink_server: dict[str, Any]) -> None:
+    """
+    真实端到端集成测试（严格语义，不允许跳过）：
+    - 上游：真实访问 HuggingFace Hub API（若网络/代理不通，测试应失败）
+    - 下游：真实 HTTP POST 到本地模拟 WeLink server（必须收到请求且字段合规）
+    - 幂等链路：alerts/seen_events/cursors 必须真实落库
+    """
+    with tempfile.TemporaryDirectory() as td:
+        db_path = f"{td}/state.sqlite3"
+        store = SqliteStateStore(db_path)
+        store.ensure_schema()
+
+        http = HttpClient(timeout_seconds=20.0, max_retries=0)
+        live_source = HuggingFaceOrgModelsSource(org="deepseek-ai", http=http, token=None)
+        sources = (_TruncatingSource(inner=live_source, max_events=2),)
+
+        matcher = RuleMatcher(keywords=("deepseek",))
+        notifiers = (
+            WeLinkNotifier(
+                webhook_url=local_welink_server["url"],
+                http=http,
+                is_at=True,
+                is_at_all=False,
+                at_accounts=("someone@corp",),
+            ),
+        )
+
+        runner = Runner(state=store, sources=sources, matcher=matcher, notifiers=notifiers)
+        runner.run_once()
+
+        conn = sqlite3.connect(db_path)
         try:
-            with tempfile.TemporaryDirectory() as td:
-                db_path = os.path.join(td, "state.sqlite3")
-                store = SqliteStateStore(db_path)
-                store.ensure_schema()
-
-                http = HttpClient(timeout_seconds=5.0, max_retries=0)
-                live_source = HuggingFaceOrgModelsSource(org="deepseek-ai", http=http, token=None)
-
-                sources = (_TruncatingSource(inner=live_source, max_events=2),)
-                matcher = RuleMatcher(keywords=("deepseek",))
-
-                webhook_url = (
-                    f"http://127.0.0.1:{port}/api/werobot/v1/webhook/send?token=test&channel=standard"
-                )
-                notifiers = (
-                    WeLinkNotifier(
-                        webhook_url=webhook_url,
-                        http=http,
-                        is_at=True,
-                        is_at_all=False,
-                        at_accounts=("someone@corp",),
-                    ),
-                )
-
-                runner = Runner(state=store, sources=sources, matcher=matcher, notifiers=notifiers)
-                try:
-                    runner.run_once()
-                except (urllib.error.URLError, OSError) as e:
-                    self.skipTest(f"Live network unreachable in this environment: {e}")
-
-                conn = sqlite3.connect(db_path)
-                try:
-                    alert_count = int(conn.execute("SELECT COUNT(*) FROM alerts").fetchone()[0])
-                    seen_count = int(conn.execute("SELECT COUNT(*) FROM seen_events").fetchone()[0])
-                    cursor = conn.execute("SELECT cursor FROM cursors LIMIT 1").fetchone()
-                finally:
-                    conn.close()
-
-                self.assertGreaterEqual(alert_count, 1)
-                self.assertGreaterEqual(seen_count, alert_count)
-                self.assertIsNotNone(cursor)
-
-            with capture.lock:
-                received = list(capture.requests)
-            self.assertGreaterEqual(len(received), 1)
-
-            payload = received[0]
-            self.assertEqual(payload["messageType"], "text")
-            self.assertIn("content", payload)
-            self.assertIn("timeStamp", payload)
-            self.assertIn("uuid", payload)
-
-            text = payload["content"]["text"]
-            self.assertIn("@someone@corp", text)
-            self.assertTrue(payload.get("isAt"))
-            self.assertEqual(payload.get("isAtAll"), False)
-            self.assertEqual(payload.get("atAccounts"), ["someone@corp"])
+            alert_count = int(conn.execute("SELECT COUNT(*) FROM alerts").fetchone()[0])
+            seen_count = int(conn.execute("SELECT COUNT(*) FROM seen_events").fetchone()[0])
+            cursor_row = conn.execute("SELECT cursor FROM cursors LIMIT 1").fetchone()
         finally:
-            server.shutdown()
-            server.server_close()
+            conn.close()
+
+        assert alert_count >= 1
+        assert seen_count >= alert_count
+        assert cursor_row is not None
+
+    capture: _CaptureState = local_welink_server["capture"]
+    with capture.lock:
+        received = list(capture.requests)
+
+    assert len(received) >= 1
+    payload = received[0]
+
+    assert payload["messageType"] == "text"
+    assert "content" in payload
+    assert "timeStamp" in payload
+    assert "uuid" in payload
+
+    text = payload["content"]["text"]
+    assert "@someone@corp" in text
+    assert payload.get("isAt") is True
+    assert payload.get("isAtAll") is False
+    assert payload.get("atAccounts") == ["someone@corp"]
