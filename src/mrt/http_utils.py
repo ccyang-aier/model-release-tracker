@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import random
+import ssl
 import time
 import urllib.error
 import urllib.parse
@@ -40,11 +41,13 @@ class HttpClient:
         user_agent: str = "model-release-tracker/0",
         max_retries: int = 3,
         base_backoff_seconds: float = 0.8,
+        verify_ssl: bool = True,
     ) -> None:
         self._timeout_seconds = timeout_seconds
         self._user_agent = user_agent
         self._max_retries = max_retries
         self._base_backoff_seconds = base_backoff_seconds
+        self._ssl_context = ssl.create_default_context() if verify_ssl else ssl._create_unverified_context()
 
     def get(self, url: str, *, headers: Mapping[str, str] | None = None) -> HttpResponse:
         request_headers = {"User-Agent": self._user_agent}
@@ -55,7 +58,7 @@ class HttpClient:
         for attempt in range(self._max_retries + 1):
             try:
                 req = urllib.request.Request(url=url, headers=request_headers, method="GET")
-                with urllib.request.urlopen(req, timeout=self._timeout_seconds) as resp:
+                with urllib.request.urlopen(req, timeout=self._timeout_seconds, context=self._ssl_context) as resp:
                     resp_headers = {k: v for k, v in resp.headers.items()}
                     return HttpResponse(
                         status=getattr(resp, "status", 200),
@@ -111,4 +114,3 @@ def with_query_params(url: str, params: Mapping[str, str]) -> str:
     q.update({k: v for k, v in params.items() if v is not None})
     new_query = urllib.parse.urlencode(q)
     return urllib.parse.urlunparse(parsed._replace(query=new_query))
-

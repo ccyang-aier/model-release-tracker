@@ -75,6 +75,7 @@ def test_runner_dedupe_and_cursor(tmp_path) -> None:  # noqa: ANN001
         sources=(src,),
         matcher=RuleMatcher(keywords=("deepseek",)),
         notifiers=(notifier,),
+        bootstrap_on_start=False,
     )
 
     report1 = runner.run_once()
@@ -113,6 +114,7 @@ def test_runner_source_poll_exception_is_caught(tmp_path, caplog) -> None:  # no
         sources=(_FailingSource(),),
         matcher=RuleMatcher(keywords=("deepseek",)),
         notifiers=(),
+        bootstrap_on_start=False,
     )
 
     caplog.set_level(logging.ERROR)

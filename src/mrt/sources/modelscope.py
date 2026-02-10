@@ -1,16 +1,13 @@
 from __future__ import annotations
 
 import json
-import re
 from dataclasses import dataclass
-from typing import Mapping
+from datetime import datetime
+from typing import Any, Mapping
 
-from ..http_utils import HttpClient
-from ..models import TrackerEvent, utc_now
+from ..http_utils import HttpClient, with_query_params
+from ..models import TrackerEvent, parse_rfc3339_datetime, utc_now
 from .base import PollResult
-
-
-_MODEL_PATH_RE = re.compile(r'href="(/models/[^"?#]+)"')
 
 
 def _decode_cursor(cursor: str | None) -> set[str]:
@@ -18,15 +15,23 @@ def _decode_cursor(cursor: str | None) -> set[str]:
         return set()
     try:
         obj = json.loads(cursor)
+        if isinstance(obj, dict) and isinstance(obj.get("known_model_ids"), list):
+            return {str(x) for x in obj["known_model_ids"] if isinstance(x, str)}
         if isinstance(obj, dict) and isinstance(obj.get("known_model_paths"), list):
-            return {str(x) for x in obj["known_model_paths"] if isinstance(x, str)}
+            ids: set[str] = set()
+            for p in obj["known_model_paths"]:
+                if not isinstance(p, str):
+                    continue
+                if "/models/" in p:
+                    ids.add(p.split("/models/", 1)[-1].strip("/"))
+            return ids
     except Exception:
         return set()
     return set()
 
 
-def _encode_cursor(known_model_paths: set[str]) -> str:
-    payload = {"known_model_paths": sorted(known_model_paths)}
+def _encode_cursor(known_model_ids: set[str]) -> str:
+    payload = {"known_model_ids": sorted(known_model_ids)}
     return json.dumps(payload, ensure_ascii=False, separators=(",", ":"))
 
 
@@ -48,22 +53,83 @@ class ModelScopeOrgModelsSource:
         return f"modelscope:{self.org}:models"
 
     def poll(self, cursor: str | None) -> PollResult:
-        known = _decode_cursor(cursor)
+        known_ids = _decode_cursor(cursor)
 
-        url = f"https://modelscope.cn/organization/{self.org}?tab=model"
-        resp = self.http.get(url, headers={"Accept": "text/html"})
-        html = resp.text()
+        page_number = 1
+        page_size = 50
+        max_items = 3000
+        found_ids: set[str] = set()
+        models: dict[str, Mapping[str, Any]] = {}
 
-        found_paths = set(_MODEL_PATH_RE.findall(html))
-        new_paths = sorted(p for p in found_paths if p not in known)
+        while page_number * page_size <= max_items:
+            url = with_query_params(
+                "https://modelscope.cn/openapi/v1/models",
+                {
+                    "owner": self.org,
+                    "sort": "last_modified",
+                    "page_number": str(page_number),
+                    "page_size": str(page_size),
+                },
+            )
+            resp = self.http.get(url, headers={"Accept": "application/json"})
+            try:
+                data = resp.json()
+            except Exception as e:  # noqa: BLE001
+                body_prefix = resp.text()[:400]
+                raise ValueError(
+                    f"ModelScope OpenAPI invalid JSON: status={resp.status} url={resp.url} body_prefix={body_prefix!r}"
+                ) from e
+
+            if not isinstance(data, dict):
+                body_prefix = resp.text()[:400]
+                raise ValueError(
+                    f"ModelScope OpenAPI expected object, got {type(data)}: status={resp.status} url={resp.url} body_prefix={body_prefix!r}"
+                )
+
+            data_obj = data.get("data")
+            if not (isinstance(data.get("success"), bool) and isinstance(data_obj, dict)):
+                body_prefix = resp.text()[:400]
+                raise ValueError(
+                    f"ModelScope OpenAPI unexpected payload: status={resp.status} url={resp.url} body_prefix={body_prefix!r}"
+                )
+
+            items = data_obj.get("models")
+            if not isinstance(items, list):
+                body_prefix = resp.text()[:400]
+                raise ValueError(
+                    f"ModelScope OpenAPI expected data.models list, got {type(items)}: status={resp.status} url={resp.url} body_prefix={body_prefix!r}"
+                )
+
+            for it in items:
+                if not isinstance(it, dict):
+                    continue
+                model_id = it.get("id")
+                if not isinstance(model_id, str) or not model_id:
+                    continue
+                found_ids.add(model_id)
+                models[model_id] = it
+
+            total_count = data_obj.get("total_count")
+            if isinstance(total_count, int) and total_count <= page_number * page_size:
+                break
+            if not items:
+                break
+            page_number += 1
+
+        new_ids = sorted(mid for mid in found_ids if mid not in known_ids)
 
         events: list[TrackerEvent] = []
         now = utc_now()
-        for path in new_paths:
-            model_id = path.split("/models/", 1)[-1].strip("/")
-            if not model_id:
-                continue
-            full_url = f"https://modelscope.cn{path}"
+        newest_last_modified: datetime | None = None
+        for model_id in new_ids:
+            raw = models.get(model_id) or {}
+            last_modified_s = raw.get("last_modified")
+            occurred_at = parse_rfc3339_datetime(last_modified_s) if isinstance(last_modified_s, str) else None
+            if occurred_at and (newest_last_modified is None or occurred_at > newest_last_modified):
+                newest_last_modified = occurred_at
+            tasks = raw.get("tasks")
+            summary = ",".join(str(x) for x in tasks if isinstance(x, str)) if isinstance(tasks, list) else ""
+            full_url = f"https://modelscope.cn/models/{model_id}"
             events.append(
                 TrackerEvent(
                     source="modelscope",
@@ -72,14 +138,13 @@ class ModelScopeOrgModelsSource:
                     event_type="model_added",
                     event_id=model_id,
                     title=model_id,
-                    summary="",
+                    summary=summary,
                     url=full_url,
-                    occurred_at=None,
+                    occurred_at=occurred_at,
                     observed_at=now,
-                    raw={"path": path},
+                    raw=raw,
                 )
             )
 
-        new_cursor = _encode_cursor(known | found_paths)
+        new_cursor = _encode_cursor(known_ids | found_ids)
         return PollResult(events=events, new_cursor=new_cursor)
-

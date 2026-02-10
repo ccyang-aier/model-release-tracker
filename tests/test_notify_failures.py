@@ -53,6 +53,7 @@ def test_notify_failure_is_recorded(tmp_path, caplog) -> None:  # noqa: ANN001
         sources=(_OneShotSource(event=event),),
         matcher=RuleMatcher(keywords=("deepseek",)),
         notifiers=(_FailingNotifier(),),
+        bootstrap_on_start=False,
     )
 
     caplog.set_level(logging.ERROR)

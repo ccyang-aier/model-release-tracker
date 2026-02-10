@@ -14,10 +14,13 @@ import pytest
 
 from mrt.http_utils import HttpClient
 from mrt.notify.welink import WeLinkNotifier
+from mrt.models import RuleMatch
 from mrt.rules.matcher import RuleMatcher
 from mrt.runner import Runner
+from mrt.sources.github import GitHubRepoIssuesSource
 from mrt.sources.base import PollResult
 from mrt.sources.huggingface import HuggingFaceOrgModelsSource
+from mrt.sources.modelscope import ModelScopeOrgModelsSource
 from mrt.state.sqlite_store import SqliteStateStore
 
 
@@ -35,7 +38,7 @@ class _TruncatingSource:
     - 再将 events 截断到较小数量，避免一次跑产生过多告警导致测试变慢
     """
 
-    inner: HuggingFaceOrgModelsSource
+    inner: object
     max_events: int
 
     def key(self) -> str:
@@ -44,6 +47,12 @@ class _TruncatingSource:
     def poll(self, cursor: str | None) -> PollResult:
         result = self.inner.poll(cursor)
         return PollResult(events=result.events[: self.max_events], new_cursor=result.new_cursor)
+
+
+@dataclass(frozen=True, slots=True)
+class _AlwaysMatch:
+    def match(self, event) -> tuple:  # noqa: ANN001, ARG002
+        return (RuleMatch(rule_id="always", reason="always"),)
 
 
 class _CaptureState:
@@ -189,7 +198,7 @@ def test_live_poll_generates_events_and_posts_to_welink(local_welink_server: dic
             ),
         )
 
-        runner = Runner(state=store, sources=sources, matcher=matcher, notifiers=notifiers)
+        runner = Runner(state=store, sources=sources, matcher=matcher, notifiers=notifiers, bootstrap_on_start=False)
         report = runner.run_once()
         assert report.source_errors == 0, "; ".join(
             f"{s.source_key}({s.source_type}): {s.error}" for s in report.sources if s.error
@@ -224,3 +233,89 @@ def test_live_poll_generates_events_and_posts_to_welink(local_welink_server: dic
     assert payload.get("isAt") is True
     assert payload.get("isAtAll") is False
     assert payload.get("atAccounts") == ["someone@corp"]
+
+
+def test_live_poll_github_issues_posts_to_welink(local_welink_server: dict[str, Any]) -> None:
+    try:
+        with socket.create_connection(("api.github.com", 443), timeout=2.0):
+            pass
+    except OSError as e:
+        pytest.skip(f"network unreachable for api.github.com: {type(e).__name__}: {e}")
+
+    token = os.environ.get("GITHUB_TOKEN")
+    if not token:
+        pytest.skip("set GITHUB_TOKEN to run live GitHub integration test")
+
+    with tempfile.TemporaryDirectory() as td:
+        db_path = f"{td}/state.sqlite3"
+        store = SqliteStateStore(db_path)
+        store.ensure_schema()
+
+        http = HttpClient(timeout_seconds=20.0, max_retries=0, verify_ssl=False)
+        src = GitHubRepoIssuesSource(repo="vllm-project/vllm", http=http, token=token)
+        sources = (_TruncatingSource(inner=src, max_events=1),)
+        notifiers = (
+            WeLinkNotifier(
+                webhook_url=local_welink_server["url"],
+                http=http,
+                is_at=True,
+                is_at_all=False,
+                at_accounts=("someone@corp",),
+            ),
+        )
+
+        runner = Runner(state=store, sources=sources, matcher=_AlwaysMatch(), notifiers=notifiers, bootstrap_on_start=False)
+        report = runner.run_once()
+        if report.source_errors:
+            errs = [s.error for s in report.sources if s.error]
+            if any(e and "rate limit" in e.lower() for e in errs):
+                pytest.skip("; ".join(e for e in errs if e))
+        assert report.source_errors == 0, "; ".join(
+            f"{s.source_key}({s.source_type}): {s.error}" for s in report.sources if s.error
+        )
+
+        conn = sqlite3.connect(db_path)
+        try:
+            alert_count = int(conn.execute("SELECT COUNT(*) FROM alerts").fetchone()[0])
+        finally:
+            conn.close()
+        assert alert_count >= 1
+
+
+def test_live_poll_modelscope_posts_to_welink(local_welink_server: dict[str, Any]) -> None:
+    try:
+        with socket.create_connection(("modelscope.cn", 443), timeout=2.0):
+            pass
+    except OSError as e:
+        pytest.skip(f"network unreachable for modelscope.cn: {type(e).__name__}: {e}")
+
+    with tempfile.TemporaryDirectory() as td:
+        db_path = f"{td}/state.sqlite3"
+        store = SqliteStateStore(db_path)
+        store.ensure_schema()
+
+        http = HttpClient(timeout_seconds=20.0, max_retries=0)
+        src = ModelScopeOrgModelsSource(org="deepseek-ai", http=http)
+        sources = (_TruncatingSource(inner=src, max_events=1),)
+        notifiers = (
+            WeLinkNotifier(
+                webhook_url=local_welink_server["url"],
+                http=http,
+                is_at=True,
+                is_at_all=False,
+                at_accounts=("someone@corp",),
+            ),
+        )
+
+        runner = Runner(state=store, sources=sources, matcher=_AlwaysMatch(), notifiers=notifiers, bootstrap_on_start=False)
+        report = runner.run_once()
+        assert report.source_errors == 0, "; ".join(
+            f"{s.source_key}({s.source_type}): {s.error}" for s in report.sources if s.error
+        )
+
+        conn = sqlite3.connect(db_path)
+        try:
+            alert_count = int(conn.execute("SELECT COUNT(*) FROM alerts").fetchone()[0])
+        finally:
+            conn.close()
+        assert alert_count >= 1

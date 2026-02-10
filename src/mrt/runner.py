@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+import os
 import time
 from dataclasses import dataclass
 from datetime import UTC, datetime
@@ -83,6 +84,7 @@ class Runner:
     matcher: RuleMatcher
     notifiers: tuple[object, ...]
     record_unmatched_as_seen: bool = True
+    bootstrap_on_start: bool = True
 
     def run_once(self) -> RunOnceReport:
         """
@@ -160,6 +162,30 @@ class Runner:
                         duration_ms=int((time.monotonic() - source_start_t) * 1000),
                     )
                 )
+                continue
+
+            if cursor is None and self.bootstrap_on_start:
+                if result.new_cursor is not None:
+                    self.state.set_cursor(source_key, result.new_cursor)
+                source_reports.append(
+                    SourceRunReport(
+                        source_key=source_key,
+                        source_type=type(source).__name__,
+                        cursor_before=cursor,
+                        cursor_after=cursor_after,
+                        events_fetched=events_fetched,
+                        events_processed=0,
+                        events_skipped_seen=0,
+                        events_matched=0,
+                        alerts_created=0,
+                        notify_attempts=0,
+                        notify_successes=0,
+                        notify_failures=0,
+                        error=None,
+                        duration_ms=int((time.monotonic() - source_start_t) * 1000),
+                    )
+                )
+                totals["events_fetched"] += events_fetched
                 continue
 
             # 排序保证通知顺序稳定（避免同一批事件在不同运行中顺序抖动）。
@@ -323,7 +349,8 @@ def build_runner(config: AppConfig) -> Runner:
     - 统一在这里做“配置 -> 实例”的装配，Runner 内只关注流程编排
     - 对 secret/token 只通过环境变量读取，避免落盘
     """
-    http = HttpClient()
+    verify_ssl = os.environ.get("MRT_HTTP_VERIFY_SSL", "1").strip().lower() not in ("0", "false", "no", "off")
+    http = HttpClient(verify_ssl=verify_ssl)
     state = SqliteStateStore(config.sqlite_path)
 
     sources: list[object] = []

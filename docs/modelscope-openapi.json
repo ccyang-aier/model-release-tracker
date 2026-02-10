@@ -1,0 +1,2434 @@
+{
+  "openapi": "3.1.1",
+  "info": {
+    "title": "ModelScope OpenAPI",
+    "description": "魔搭社区 OpenAPI 文档",
+    "version": "1.1.0",
+    "termsOfService": "https://www.modelscope.cn/protocol/%E8%81%94%E7%B3%BB%E6%88%91%E4%BB%AC",
+    "contact": {
+      "name": "modelscope",
+      "url": "https://www.modelscope.cn/protocol/%E8%81%94%E7%B3%BB%E6%88%91%E4%BB%AC",
+      "email": "contact@modelscope.cn"
+    },
+    "license": {
+      "name": "Apache 2.0",
+      "url": "https://www.apache.org/licenses/LICENSE-2.0.html"
+    }
+  },
+  "servers": [
+    {
+      "url": "https://modelscope.cn/openapi/v1"
+    }
+  ],
+  "security": [
+    {
+      "bearerAuth": []
+    }
+  ],
+  "tags": [
+    {
+      "name": "User",
+      "description": "用户相关接口"
+    },
+    {
+      "name": "Models",
+      "description": "模型相关接口"
+    },
+    {
+      "name": "Datasets",
+      "description": "数据集相关接口"
+    },
+    {
+      "name": "MCP",
+      "description": "MCP 服务相关接口"
+    }
+  ],
+  "externalDocs": {
+    "description": "了解更多关于 ModelScope 的信息",
+    "url": "https://modelscope.cn"
+  },
+  "paths": {
+    "/users/me": {
+      "get": {
+        "operationId": "getCurrentUser",
+        "summary": "获取当前用户信息",
+        "description": "获取当前已认证用户的个人信息。",
+        "tags": [
+          "User"
+        ],
+        "parameters": [],
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/get-current-user-success"
+          },
+          "401": {
+            "$ref": "#/components/responses/unauthorized"
+          },
+          "500": {
+            "$ref": "#/components/responses/internal-server-error"
+          },
+          "503": {
+            "$ref": "#/components/responses/service-unavailable"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/models": {
+      "get": {
+        "operationId": "listModels",
+        "summary": "获取模型列表",
+        "description": "列出模型",
+        "tags": [
+          "Models"
+        ],
+        "parameters": [
+          {
+            "name": "search",
+            "in": "query",
+            "description": "针对模型名称、作者（包括组织、个人）的子字符串关键词进行搜索",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "maxLength": 100,
+              "examples": [
+                "Qwen",
+                "glm"
+              ]
+            }
+          },
+          {
+            "name": "owner",
+            "in": "query",
+            "description": "针对模型作者（包括组织、个人）进行搜索",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "examples": [
+                "iic",
+                "ZhipuAI"
+              ]
+            }
+          },
+          {
+            "name": "sort",
+            "in": "query",
+            "description": "排序方式",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "default",
+                "downloads",
+                "likes",
+                "last_modified"
+              ],
+              "default": "default",
+              "examples": [
+                "default",
+                "downloads",
+                "likes",
+                "last_modified"
+              ]
+            }
+          },
+          {
+            "name": "page_number",
+            "in": "query",
+            "description": "页码，限制 page_number * page_size <= 3000",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "default": 1,
+              "examples": [
+                1
+              ]
+            }
+          },
+          {
+            "name": "page_size",
+            "in": "query",
+            "description": "每页大小，限制 page_number * page_size <= 3000",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 50,
+              "default": 10,
+              "examples": [
+                10
+              ]
+            }
+          },
+          {
+            "name": "filter.task",
+            "in": "query",
+            "description": "按任务筛选（示例：text-generation / image-captioning）",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "examples": [
+                "text-generation",
+                "image-captioning"
+              ]
+            }
+          },
+          {
+            "name": "filter.library",
+            "in": "query",
+            "description": "按库/框架筛选（示例：pytorch / safetensors / diffusers / transformer）",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "examples": [
+                "pytorch",
+                "safetensors",
+                "diffusers",
+                "transformer"
+              ]
+            }
+          },
+          {
+            "name": "filter.model_type",
+            "in": "query",
+            "description": "按模型类型筛选（示例：qwen3_moe / glm4v）",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "examples": [
+                "qwen3_moe",
+                "glm4v"
+              ]
+            }
+          },
+          {
+            "name": "filter.custom_tag",
+            "in": "query",
+            "description": "按自定义标签筛选（示例：llm）",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "examples": [
+                "common-crawl",
+                "markdown",
+                "math",
+                "html-parsing"
+              ]
+            }
+          },
+          {
+            "name": "filter.license",
+            "in": "query",
+            "description": "按许可证筛选（示例：Apache License 2.0 / MIT License）",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "examples": [
+                "Apache License 2.0",
+                "MIT License"
+              ]
+            }
+          },
+          {
+            "name": "filter.deploy",
+            "in": "query",
+            "description": "按部署方式筛选（示例：swingdeploy）",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "examples": [
+                "swingdeploy"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/list-models-success"
+          },
+          "401": {
+            "$ref": "#/components/responses/unauthorized"
+          },
+          "500": {
+            "$ref": "#/components/responses/internal-server-error"
+          },
+          "503": {
+            "$ref": "#/components/responses/service-unavailable"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/models/{owner}/{repo_name}": {
+      "get": {
+        "operationId": "getModel",
+        "summary": "获取模型详情",
+        "description": "根据 owner/repo_name 获取模型详情",
+        "tags": [
+          "Models"
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/owner"
+          },
+          {
+            "$ref": "#/components/parameters/repo_name"
+          }
+        ],
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/get-model-success"
+          },
+          "401": {
+            "$ref": "#/components/responses/unauthorized"
+          },
+          "404": {
+            "$ref": "#/components/responses/not-found"
+          },
+          "500": {
+            "$ref": "#/components/responses/internal-server-error"
+          },
+          "503": {
+            "$ref": "#/components/responses/service-unavailable"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/datasets": {
+      "get": {
+        "operationId": "listDatasets",
+        "summary": "获取数据集列表",
+        "description": "列出数据集",
+        "tags": [
+          "Datasets"
+        ],
+        "parameters": [
+          {
+            "name": "search",
+            "in": "query",
+            "description": "针对数据集中文名称、数据集英文名称、作者（包括组织、个人）的子字符串关键词进行搜索",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "maxLength": 100,
+              "examples": [
+                "ImageNet",
+                "中文语料库"
+              ]
+            }
+          },
+          {
+            "name": "owner",
+            "in": "query",
+            "description": "针对数据集作者（包括组织、个人）进行搜索",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "examples": [
+                "modelscope",
+                "AI-ModelScope"
+              ]
+            }
+          },
+          {
+            "name": "sort",
+            "in": "query",
+            "description": "排序方式",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "default",
+                "downloads",
+                "likes",
+                "last_modified"
+              ],
+              "default": "default",
+              "examples": [
+                "default",
+                "downloads",
+                "likes",
+                "last_modified"
+              ]
+            }
+          },
+          {
+            "name": "page_number",
+            "in": "query",
+            "description": "页码，限制 page_number * page_size <= 3000",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "default": 1,
+              "examples": [
+                1
+              ]
+            }
+          },
+          {
+            "name": "page_size",
+            "in": "query",
+            "description": "每页大小，限制 page_number * page_size <= 3000",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 50,
+              "default": 10,
+              "examples": [
+                10
+              ]
+            }
+          },
+          {
+            "name": "filter.task",
+            "in": "query",
+            "description": "按任务筛选（示例：text-classification）",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "examples": [
+                "text-classification"
+              ]
+            }
+          },
+          {
+            "name": "filter.license",
+            "in": "query",
+            "description": "按许可证筛选（示例：Apache License 2.0 / cc-by-4.0）",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "examples": [
+                "Apache License 2.0",
+                "cc-by-4.0"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/list-datasets-success"
+          },
+          "401": {
+            "$ref": "#/components/responses/unauthorized"
+          },
+          "500": {
+            "$ref": "#/components/responses/internal-server-error"
+          },
+          "503": {
+            "$ref": "#/components/responses/service-unavailable"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/datasets/{owner}/{repo_name}": {
+      "get": {
+        "operationId": "getDataset",
+        "summary": "获取数据集详情",
+        "description": "根据 owner/repo_name 获取数据集详情",
+        "tags": [
+          "Datasets"
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/owner"
+          },
+          {
+            "$ref": "#/components/parameters/repo_name"
+          }
+        ],
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/get-dataset-success"
+          },
+          "401": {
+            "$ref": "#/components/responses/unauthorized"
+          },
+          "404": {
+            "$ref": "#/components/responses/not-found"
+          },
+          "500": {
+            "$ref": "#/components/responses/internal-server-error"
+          },
+          "503": {
+            "$ref": "#/components/responses/service-unavailable"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/mcp/servers": {
+      "put": {
+        "operationId": "listMcpServers",
+        "summary": "获取MCP服务列表",
+        "description": "返回查询的 ModelScope MCP 广场服务列表",
+        "tags": [
+          "MCP"
+        ],
+        "requestBody": {
+          "description": "查询参数",
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "search": {
+                    "type": "string",
+                    "description": "支持针对服务中文名称、服务英文名称、作者/所有者用户名进行搜索"
+                  },
+                  "filter": {
+                    "type": "object",
+                    "description": "筛选条件",
+                    "properties": {
+                      "category": {
+                        "type": "string",
+                        "description": "指定筛选类别标签。与tag,is_hosted同时传入时,取三者的交集",
+                        "examples": [
+                          "communication"
+                        ]
+                      },
+                      "is_hosted": {
+                        "type": "boolean",
+                        "description": "指定筛选hosted或未hosted MCP服务。与tag,category同时传入时,取三者的交集",
+                        "examples": [
+                          true
+                        ]
+                      }
+                    }
+                  },
+                  "page_number": {
+                    "type": "integer",
+                    "description": "页码，默认为 1，限制 page_number * page_size <= 100",
+                    "default": 1
+                  },
+                  "page_size": {
+                    "type": "integer",
+                    "description": "每页大小，默认为20，限制 page_number * page_size <= 100",
+                    "default": 20
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/list-mcp-servers-success"
+          },
+          "401": {
+            "$ref": "#/components/responses/unauthorized"
+          },
+          "500": {
+            "$ref": "#/components/responses/internal-server-error"
+          },
+          "503": {
+            "$ref": "#/components/responses/service-unavailable"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/mcp/servers/operational": {
+      "get": {
+        "operationId": "listOperationalMcpServers",
+        "summary": "获取用户托管MCP服务列表",
+        "description": "获取用户托管MCP服务列表",
+        "tags": [
+          "MCP"
+        ],
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/list-operational-mcp-servers-success"
+          },
+          "401": {
+            "$ref": "#/components/responses/unauthorized"
+          },
+          "500": {
+            "$ref": "#/components/responses/internal-server-error"
+          },
+          "503": {
+            "$ref": "#/components/responses/service-unavailable"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/mcp/servers/{id}": {
+      "get": {
+        "operationId": "getMcpServer",
+        "summary": "获取指定MCP服务详情",
+        "description": "返回指定 MCP 服务的详细信息",
+        "tags": [
+          "MCP"
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/mcp_server_id"
+          },
+          {
+            "name": "get_operational_url",
+            "in": "query",
+            "description": "传入true时返回当前用户在modelscope上托管的MCP服务链接（例如SSE_URL），默认false",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": false
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/get-mcp-server-success"
+          },
+          "401": {
+            "$ref": "#/components/responses/unauthorized"
+          },
+          "404": {
+            "$ref": "#/components/responses/not-found"
+          },
+          "500": {
+            "$ref": "#/components/responses/internal-server-error"
+          },
+          "503": {
+            "$ref": "#/components/responses/service-unavailable"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/mcp/servers/{id}/deploy": {
+      "post": {
+        "operationId": "deployMcpServer",
+        "summary": "部署MCP服务",
+        "description": "部署MCP服务",
+        "tags": [
+          "MCP"
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/mcp_server_id"
+          }
+        ],
+        "requestBody": {
+          "description": "部署参数",
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "transport_type": {
+                    "type": "string",
+                    "description": "传输方式: sse/streamable_http",
+                    "enum": [
+                      "sse",
+                      "streamable_http"
+                    ],
+                    "examples": [
+                      "streamable_http"
+                    ]
+                  },
+                  "expiration_minutes": {
+                    "type": "integer",
+                    "description": "有效期（分钟），-1 代表长期有效",
+                    "examples": [
+                      -1,
+                      60,
+                      1440
+                    ]
+                  },
+                  "auth_check": {
+                    "type": "boolean",
+                    "description": "远程 url 连接时是否需要提供魔搭访问令牌鉴权",
+                    "default": false
+                  },
+                  "env_info": {
+                    "type": "object",
+                    "description": "MCP环境变量，具体需要传入的环境变量可在获取指定MCP服务详情接口返回的 env_schema 字段中获取",
+                    "additionalProperties": true
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/deploy-mcp-server-success"
+          },
+          "401": {
+            "$ref": "#/components/responses/unauthorized"
+          },
+          "404": {
+            "$ref": "#/components/responses/not-found"
+          },
+          "500": {
+            "$ref": "#/components/responses/internal-server-error"
+          },
+          "503": {
+            "$ref": "#/components/responses/service-unavailable"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/mcp/servers/{id}/undeploy": {
+      "delete": {
+        "operationId": "undeployMcpServer",
+        "summary": "解除MCP服务部署",
+        "description": "解除MCP服务部署",
+        "tags": [
+          "MCP"
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/mcp_server_id"
+          }
+        ],
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/undeploy-mcp-server-success"
+          },
+          "401": {
+            "$ref": "#/components/responses/unauthorized"
+          },
+          "404": {
+            "$ref": "#/components/responses/not-found"
+          },
+          "500": {
+            "$ref": "#/components/responses/internal-server-error"
+          },
+          "503": {
+            "$ref": "#/components/responses/service-unavailable"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "User": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/UserPublic"
+          },
+          {
+            "$ref": "#/components/schemas/UserPrivate"
+          }
+        ],
+        "description": "用户完整信息(包含私有信息)"
+      },
+      "UserPublic": {
+        "type": "object",
+        "description": "用户公开信息",
+        "properties": {
+          "username": {
+            "type": "string",
+            "description": "用户名",
+            "examples": [
+              "tester"
+            ]
+          },
+          "nickname": {
+            "type": "string",
+            "description": "昵称",
+            "examples": [
+              "测试用户"
+            ]
+          },
+          "description": {
+            "type": "string",
+            "description": "描述",
+            "examples": [
+              "这是一个测试用户"
+            ]
+          },
+          "avatar_url": {
+            "type": "string",
+            "format": "uri",
+            "description": "头像图片URL地址",
+            "examples": [
+              "https://resouces.modelscope.cn/avatar/516aa51f-5fb7-49eb-930c-e90500ae13ca.png"
+            ]
+          }
+        },
+        "required": [
+          "username"
+        ]
+      },
+      "UserPrivate": {
+        "type": "object",
+        "description": "用户私有信息(仅自己可见)",
+        "properties": {
+          "email": {
+            "type": "string",
+            "format": "email",
+            "description": "邮箱地址",
+            "examples": [
+              "test@modelscope.cn"
+            ]
+          }
+        }
+      },
+      "UserResponse": {
+        "type": "object",
+        "description": "用户信息响应",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "description": "成功响应时始终为 true",
+            "examples": [
+              true
+            ]
+          },
+          "data": {
+            "$ref": "#/components/schemas/User",
+            "description": "用户信息"
+          },
+          "request_id": {
+            "type": "string",
+            "description": "请求ID",
+            "examples": [
+              "4d3f4b7d-95be-4e6f-95eb-d75178375bd2"
+            ]
+          }
+        },
+        "required": [
+          "success",
+          "request_id"
+        ]
+      },
+      "ErrorResponse": {
+        "type": "object",
+        "description": "错误响应格式",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "description": "错误响应时始终为 false",
+            "examples": [
+              false
+            ]
+          },
+          "code": {
+            "type": "string",
+            "description": "错误码",
+            "examples": [
+              "InputParameterError"
+            ]
+          },
+          "message": {
+            "type": "string",
+            "description": "错误消息",
+            "examples": [
+              "Unauthorized access"
+            ]
+          },
+          "request_id": {
+            "type": "string",
+            "description": "请求ID",
+            "examples": [
+              "4d3f4b7d-95be-4e6f-95eb-d75178375bd2"
+            ]
+          }
+        },
+        "required": [
+          "success",
+          "code",
+          "message",
+          "request_id"
+        ]
+      },
+      "Model": {
+        "type": "object",
+        "description": "模型摘要信息",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "模型仓库名（repo_id，格式为 owner/repo_name）",
+            "examples": [
+              "iic/QwenLong-L1.5-30B-A3B",
+              "ZhipuAI/AutoGLM-Phone-9B"
+            ]
+          },
+          "display_name": {
+            "type": "string",
+            "description": "模型展示名称",
+            "nullable": true,
+            "examples": [
+              "QwenLong-L1.5-30B-A3B",
+              "AutoGLM-Phone-9B"
+            ]
+          },
+          "description": {
+            "type": "string",
+            "description": "模型简介",
+            "nullable": true,
+            "examples": [
+              ""
+            ]
+          },
+          "downloads": {
+            "type": "integer",
+            "description": "下载量",
+            "examples": [
+              1466,
+              28525
+            ]
+          },
+          "likes": {
+            "type": "integer",
+            "description": "喜欢量",
+            "examples": [
+              25,
+              265
+            ]
+          },
+          "license": {
+            "type": "string",
+            "description": "许可证",
+            "nullable": true,
+            "examples": [
+              "apache-2.0",
+              "MIT License"
+            ]
+          },
+          "tasks": {
+            "type": "array",
+            "description": "任务列表",
+            "items": {
+              "type": "string"
+            },
+            "examples": [
+              [
+                "text-generation"
+              ],
+              [
+                "image-captioning"
+              ]
+            ]
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "创建时间（ISO 8601 UTC）",
+            "examples": [
+              "2025-12-14T12:26:15Z"
+            ]
+          },
+          "last_modified": {
+            "type": "string",
+            "format": "date-time",
+            "description": "最近修改时间（ISO 8601 UTC）",
+            "examples": [
+              "2025-12-16T03:34:26Z"
+            ]
+          },
+          "file_size": {
+            "type": "integer",
+            "description": "文件大小（字节）",
+            "examples": [
+              61081671123
+            ]
+          },
+          "params": {
+            "type": "integer",
+            "description": "参数量",
+            "examples": [
+              30532122624
+            ]
+          },
+          "tags": {
+            "type": "array",
+            "description": "标签列表",
+            "items": {
+              "type": "string"
+            },
+            "nullable": true,
+            "examples": [
+              [
+                "license:apache-2.0",
+                "model_type:qwen3_moe",
+                "library:transformer",
+                "library:safetensors",
+                "library:pytorch",
+                "task:text-generation",
+                "deploy:swingdeploy"
+              ]
+            ]
+          },
+          "private": {
+            "type": "boolean",
+            "description": "是否非公开模型",
+            "examples": [
+              false
+            ]
+          },
+          "gated": {
+            "type": "boolean",
+            "description": "是否申请制模型，通过申请后可访问",
+            "examples": [
+              false
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "downloads",
+          "likes",
+          "tasks",
+          "created_at",
+          "last_modified",
+          "file_size",
+          "params",
+          "private",
+          "gated"
+        ]
+      },
+      "ModelDetail": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/Model"
+          },
+          {
+            "type": "object",
+            "description": "模型详情信息",
+            "properties": {
+              "readme": {
+                "type": "string",
+                "description": "README 内容",
+                "nullable": true,
+                "examples": [
+                  "hello"
+                ]
+              }
+            }
+          }
+        ]
+      },
+      "ModelList": {
+        "type": "object",
+        "description": "模型列表与分页信息",
+        "properties": {
+          "models": {
+            "type": "array",
+            "description": "结果模型列表",
+            "items": {
+              "$ref": "#/components/schemas/Model"
+            }
+          },
+          "total_count": {
+            "type": "integer",
+            "description": "符合筛选条件的模型总数",
+            "examples": [
+              43127
+            ]
+          },
+          "page_number": {
+            "type": "integer",
+            "description": "当前页码",
+            "examples": [
+              1
+            ]
+          },
+          "page_size": {
+            "type": "integer",
+            "description": "每页大小",
+            "examples": [
+              10
+            ]
+          }
+        },
+        "required": [
+          "models",
+          "total_count",
+          "page_number",
+          "page_size"
+        ]
+      },
+      "ModelListResponse": {
+        "type": "object",
+        "description": "列出模型的标准响应包裹格式",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "description": "成功时始终为 true",
+            "examples": [
+              true
+            ]
+          },
+          "data": {
+            "$ref": "#/components/schemas/ModelList",
+            "description": "模型列表数据"
+          },
+          "request_id": {
+            "type": "string",
+            "description": "请求 ID",
+            "examples": [
+              "4d3f4b7d-95be-4e6f-95eb-d75178375bd3"
+            ]
+          }
+        },
+        "required": [
+          "success",
+          "data",
+          "request_id"
+        ]
+      },
+      "ModelDetailResponse": {
+        "type": "object",
+        "description": "获取模型详情的标准响应包裹格式",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "description": "成功时始终为 true",
+            "examples": [
+              true
+            ]
+          },
+          "data": {
+            "$ref": "#/components/schemas/ModelDetail",
+            "description": "模型详情数据"
+          },
+          "request_id": {
+            "type": "string",
+            "description": "请求 ID",
+            "examples": [
+              "4d3f4b7d-95be-4e6f-95eb-d75178375bd3"
+            ]
+          }
+        },
+        "required": [
+          "success",
+          "data",
+          "request_id"
+        ]
+      },
+      "Dataset": {
+        "type": "object",
+        "description": "数据集摘要信息",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "数据集仓库名（repo_id，格式为 owner/repo_name）",
+            "examples": [
+              "DAMO_NLP/jd",
+              "iic/nlp_domain_classification_chinese_testset"
+            ]
+          },
+          "display_name": {
+            "type": "string",
+            "description": "数据集展示名称",
+            "nullable": true,
+            "examples": [
+              "商品评论情感预测",
+              "中文文本领域分类测试集"
+            ]
+          },
+          "description": {
+            "type": "string",
+            "description": "数据集简介",
+            "nullable": true,
+            "examples": [
+              "",
+              "..."
+            ]
+          },
+          "file_size": {
+            "type": "integer",
+            "description": "文件大小（字节）",
+            "examples": [
+              0
+            ]
+          },
+          "downloads": {
+            "type": "integer",
+            "description": "下载量",
+            "examples": [
+              53996,
+              2401
+            ]
+          },
+          "likes": {
+            "type": "integer",
+            "description": "喜欢量",
+            "examples": [
+              102,
+              23
+            ]
+          },
+          "license": {
+            "type": "string",
+            "description": "许可证",
+            "nullable": true,
+            "examples": [
+              "Apache License 2.0",
+              "cc-by-4.0"
+            ]
+          },
+          "tasks": {
+            "type": "array",
+            "description": "任务列表",
+            "items": {
+              "type": "string"
+            },
+            "examples": [
+              [
+                "text-classification"
+              ],
+              []
+            ]
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "创建时间（ISO 8601 UTC）",
+            "examples": [
+              "2022-09-28T06:30:31Z",
+              "2025-11-25T14:30:22Z"
+            ]
+          },
+          "last_modified": {
+            "type": "string",
+            "format": "date-time",
+            "description": "最近修改时间（ISO 8601 UTC）",
+            "examples": [
+              "2022-10-30T03:36:39Z",
+              "2026-01-01T00:31:42Z"
+            ]
+          },
+          "tags": {
+            "type": "array",
+            "description": "标签列表",
+            "items": {
+              "type": "string"
+            },
+            "nullable": true,
+            "examples": [
+              [
+                "license:Apache License 2.0",
+                "task:text-classification"
+              ],
+              [
+                "license:cc-by-4.0",
+                "custom_tag:common-crawl"
+              ]
+            ]
+          },
+          "private": {
+            "type": "boolean",
+            "description": "是否非公开数据集",
+            "examples": [
+              false
+            ]
+          },
+          "gated": {
+            "type": "boolean",
+            "description": "是否申请制数据集，通过申请后可访问",
+            "examples": [
+              false
+            ]
+          },
+          "login_required": {
+            "type": "boolean",
+            "description": "是否登录后才可下载",
+            "examples": [
+              false
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "downloads",
+          "likes",
+          "private",
+          "gated",
+          "login_required",
+          "created_at",
+          "last_modified"
+        ]
+      },
+      "DatasetDetail": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/Dataset"
+          },
+          {
+            "type": "object",
+            "description": "数据集详情信息",
+            "properties": {
+              "readme": {
+                "type": "string",
+                "description": "README 内容",
+                "nullable": true,
+                "examples": [
+                  "hello"
+                ]
+              }
+            }
+          }
+        ]
+      },
+      "DatasetList": {
+        "type": "object",
+        "description": "数据集列表与分页信息",
+        "properties": {
+          "datasets": {
+            "type": "array",
+            "description": "结果数据集列表",
+            "items": {
+              "$ref": "#/components/schemas/Dataset"
+            }
+          },
+          "total_count": {
+            "type": "integer",
+            "description": "符合筛选条件的数据集总数",
+            "examples": [
+              60
+            ]
+          },
+          "page_number": {
+            "type": "integer",
+            "description": "当前页码",
+            "examples": [
+              1
+            ]
+          },
+          "page_size": {
+            "type": "integer",
+            "description": "每页大小",
+            "examples": [
+              10
+            ]
+          }
+        },
+        "required": [
+          "datasets",
+          "total_count",
+          "page_number",
+          "page_size"
+        ]
+      },
+      "DatasetListResponse": {
+        "type": "object",
+        "description": "列出数据集的标准响应包裹格式",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "description": "成功时始终为 true",
+            "examples": [
+              true
+            ]
+          },
+          "data": {
+            "$ref": "#/components/schemas/DatasetList",
+            "description": "数据集列表数据"
+          },
+          "request_id": {
+            "type": "string",
+            "description": "请求 ID",
+            "examples": [
+              "4d3f4b7d-95be-4e6f-95eb-d75178375bd3"
+            ]
+          }
+        },
+        "required": [
+          "success",
+          "data",
+          "request_id"
+        ]
+      },
+      "DatasetDetailResponse": {
+        "type": "object",
+        "description": "获取数据集详情的标准响应包裹格式",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "description": "成功时始终为 true",
+            "examples": [
+              true
+            ]
+          },
+          "data": {
+            "$ref": "#/components/schemas/DatasetDetail",
+            "description": "数据集详情数据"
+          },
+          "request_id": {
+            "type": "string",
+            "description": "请求 ID",
+            "examples": [
+              "4d3f4b7d-95be-4e6f-95eb-d75178375bd3"
+            ]
+          }
+        },
+        "required": [
+          "success",
+          "data",
+          "request_id"
+        ]
+      },
+      "McpServerLocale": {
+        "type": "object",
+        "description": "MCP服务在对应语言环境下的内容",
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "MCP服务在对应语言环境下的服务名称",
+            "examples": [
+              "Fetch网页内容抓取"
+            ]
+          },
+          "description": {
+            "type": "string",
+            "description": "MCP服务在对应语言环境下的服务简介",
+            "examples": [
+              "该服务器使大型语言模型能够检索和处理网页内容..."
+            ]
+          },
+          "readme": {
+            "type": "string",
+            "description": "MCP服务介绍（仅详情接口返回）",
+            "examples": [
+              "# Fetch MCP Server..."
+            ]
+          }
+        }
+      },
+      "McpServerLocales": {
+        "type": "object",
+        "description": "不同语言环境下的内容展示",
+        "properties": {
+          "zh": {
+            "$ref": "#/components/schemas/McpServerLocale",
+            "description": "中文环境"
+          },
+          "en": {
+            "$ref": "#/components/schemas/McpServerLocale",
+            "description": "英文环境"
+          }
+        }
+      },
+      "McpOperationalUrl": {
+        "type": "object",
+        "description": "MCP服务托管链接信息",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "MCP服务链接命名标识",
+            "examples": [
+              "platform-pool"
+            ]
+          },
+          "url": {
+            "type": "string",
+            "description": "MCP服务远程连接地址",
+            "examples": [
+              "https://mcp.api-inference.modelscope.net/xxxx/mcp"
+            ]
+          },
+          "transport_type": {
+            "type": "string",
+            "description": "MCP服务链接传输方式",
+            "examples": [
+              "streamable_http",
+              "sse"
+            ]
+          },
+          "auth_required": {
+            "type": "boolean",
+            "description": "远程 url 连接时是否需要提供魔搭访问令牌鉴权",
+            "examples": [
+              false
+            ]
+          },
+          "expiration": {
+            "type": "string",
+            "description": "MCP服务链接有效期",
+            "examples": [
+              "2025-10-01 21:00:00"
+            ]
+          },
+          "accessible": {
+            "type": "boolean",
+            "description": "是否有权限访问该MCP服务详情。当所有者设置为非公开或MCP服务被删除时，无权访问。",
+            "examples": [
+              true
+            ]
+          }
+        }
+      },
+      "McpServerSummary": {
+        "type": "object",
+        "description": "MCP服务摘要信息",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "服务ID。由平台后台收录的MCP，ID 默认为@author/server_name，当被社区用户认领后将会变更为user_name/server_name；由社区用户自发提交的MCP，ID 为user_name/server_name。",
+            "examples": [
+              "@modelcontextprotocol/fetch"
+            ]
+          },
+          "name": {
+            "type": "string",
+            "description": "MCP服务在魔搭社区的名称",
+            "examples": [
+              "Fetch网页内容抓取"
+            ]
+          },
+          "chinese_name": {
+            "type": "string",
+            "description": "MCP服务在魔搭社区的中文名称",
+            "examples": [
+              "Fetch网页内容抓取"
+            ]
+          },
+          "description": {
+            "type": "string",
+            "description": "MCP服务简介",
+            "examples": [
+              "该服务器使大型语言模型能够检索和处理网页内容..."
+            ]
+          },
+          "logo_url": {
+            "type": "string",
+            "description": "logo图片URL链接",
+            "examples": [
+              "https://resources.modelscope.cn/..."
+            ]
+          },
+          "publisher": {
+            "type": "string",
+            "description": "发布时原始ID",
+            "examples": [
+              "@modelcontextprotocol/fetch"
+            ]
+          },
+          "categories": {
+            "type": "array",
+            "description": "该MCP服务所属分类",
+            "items": {
+              "type": "string"
+            },
+            "examples": [
+              [
+                "browser-automation"
+              ]
+            ]
+          },
+          "tags": {
+            "type": "array",
+            "description": "该MCP服务的标签列表",
+            "items": {
+              "type": "string"
+            },
+            "examples": [
+              [
+                "browser-automation"
+              ]
+            ]
+          },
+          "view_count": {
+            "type": "integer",
+            "description": "该MCP服务的累计访问量",
+            "examples": [
+              30667
+            ]
+          },
+          "locales": {
+            "$ref": "#/components/schemas/McpServerLocales"
+          }
+        },
+        "required": [
+          "id"
+        ]
+      },
+      "McpServerDetail": {
+        "type": "object",
+        "description": "MCP服务详细信息",
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/McpServerSummary"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "author": {
+                "type": "string",
+                "description": "MCP服务开发者",
+                "examples": [
+                  "modelcontextprotocol"
+                ]
+              },
+              "owner": {
+                "type": "string",
+                "description": "MCP服务归属的魔搭用户/组织ID",
+                "examples": [
+                  ""
+                ]
+              },
+              "readme": {
+                "type": "string",
+                "description": "MCP服务介绍",
+                "examples": [
+                  "# Fetch MCP Server..."
+                ]
+              },
+              "source_url": {
+                "type": "string",
+                "description": "MCP服务来源项目主页地址",
+                "examples": [
+                  "https://github.com/modelcontextprotocol/..."
+                ]
+              },
+              "github_stars": {
+                "type": "integer",
+                "description": "该 MCP 服务对应 github 原始仓库的 stars 数量",
+                "examples": [
+                  1234
+                ]
+              },
+              "is_hosted": {
+                "type": "boolean",
+                "description": "该MCP服务是否支持托管部署",
+                "examples": [
+                  true
+                ]
+              },
+              "is_verified": {
+                "type": "boolean",
+                "description": "托管MCP服务是否经过平台验证测试",
+                "examples": [
+                  true
+                ]
+              },
+              "env_schema": {
+                "type": "object",
+                "description": "该服务连接部署的环境变量配置",
+                "additionalProperties": true
+              },
+              "server_config": {
+                "type": "array",
+                "description": "MCP服务配置信息",
+                "items": {}
+              },
+              "operational_urls": {
+                "type": "array",
+                "description": "当get_operational_url=True且当前用户已连接该 MCP 服务时则返回，否则为空",
+                "items": {
+                  "$ref": "#/components/schemas/McpOperationalUrl"
+                }
+              }
+            }
+          }
+        ]
+      },
+      "McpServerOperational": {
+        "type": "object",
+        "description": "用户托管的MCP服务信息",
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/McpServerSummary"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "operational_urls": {
+                "type": "array",
+                "description": "MCP服务托管链接列表",
+                "items": {
+                  "$ref": "#/components/schemas/McpOperationalUrl"
+                }
+              }
+            }
+          }
+        ]
+      },
+      "McpServerListResponse": {
+        "type": "object",
+        "description": "MCP服务列表响应",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "examples": [
+              true
+            ]
+          },
+          "data": {
+            "type": "object",
+            "properties": {
+              "mcp_server_list": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/McpServerSummary"
+                }
+              },
+              "total_count": {
+                "type": "integer",
+                "description": "搜索符合条件的mcp server总个数"
+              }
+            }
+          },
+          "message": {
+            "type": "string",
+            "examples": [
+              "success"
+            ]
+          },
+          "request_id": {
+            "type": "string",
+            "examples": [
+              "c55709d2-4e09-4bd8-be84-d8518bc46363"
+            ]
+          }
+        },
+        "required": [
+          "success",
+          "request_id"
+        ]
+      },
+      "McpServerOperationalListResponse": {
+        "type": "object",
+        "description": "用户托管MCP服务列表响应",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "examples": [
+              true
+            ]
+          },
+          "data": {
+            "type": "object",
+            "properties": {
+              "mcp_server_list": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/McpServerOperational"
+                }
+              },
+              "total_count": {
+                "type": "integer",
+                "description": "服务链接总数"
+              }
+            }
+          },
+          "message": {
+            "type": "string",
+            "examples": [
+              "success"
+            ]
+          },
+          "request_id": {
+            "type": "string",
+            "examples": [
+              "c55709d2-4e09-4bd8-be84-d8518bc46363"
+            ]
+          }
+        },
+        "required": [
+          "success",
+          "request_id"
+        ]
+      },
+      "McpServerDetailResponse": {
+        "type": "object",
+        "description": "MCP服务详情响应",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "examples": [
+              true
+            ]
+          },
+          "data": {
+            "$ref": "#/components/schemas/McpServerDetail"
+          },
+          "message": {
+            "type": "string",
+            "examples": [
+              "success"
+            ]
+          },
+          "request_id": {
+            "type": "string",
+            "examples": [
+              "c55709d2-4e09-4bd8-be84-d8518bc46363"
+            ]
+          }
+        },
+        "required": [
+          "success",
+          "request_id"
+        ]
+      },
+      "McpDeployResponse": {
+        "type": "object",
+        "description": "MCP服务部署响应",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "examples": [
+              true
+            ]
+          },
+          "data": {
+            "$ref": "#/components/schemas/McpOperationalUrl"
+          },
+          "message": {
+            "type": "string",
+            "examples": [
+              "success"
+            ]
+          },
+          "request_id": {
+            "type": "string",
+            "examples": [
+              "c55709d2-4e09-4bd8-be84-d8518bc46363"
+            ]
+          }
+        },
+        "required": [
+          "success",
+          "request_id"
+        ]
+      },
+      "McpUndeployResponse": {
+        "type": "object",
+        "description": "MCP服务解除部署响应",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "examples": [
+              true
+            ]
+          },
+          "message": {
+            "type": "string",
+            "examples": [
+              "success"
+            ]
+          },
+          "request_id": {
+            "type": "string",
+            "examples": [
+              "c55709d2-4e09-4bd8-be84-d8518bc46363"
+            ]
+          }
+        },
+        "required": [
+          "success",
+          "request_id"
+        ]
+      }
+    },
+    "responses": {
+      "unauthorized": {
+        "description": "未通过认证",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ErrorResponse"
+            },
+            "examples": {
+              "invalid-authentication": {
+                "$ref": "#/components/examples/invalid-authentication"
+              }
+            }
+          }
+        }
+      },
+      "not-found": {
+        "description": "资源未找到",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ErrorResponse"
+            },
+            "examples": {
+              "resource-not-found": {
+                "$ref": "#/components/examples/resource-not-found"
+              }
+            }
+          }
+        }
+      },
+      "internal-server-error": {
+        "description": "内部服务错误",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ErrorResponse"
+            },
+            "examples": {
+              "internal-server-error": {
+                "$ref": "#/components/examples/internal-server-error"
+              }
+            }
+          }
+        }
+      },
+      "service-unavailable": {
+        "description": "服务不可用",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ErrorResponse"
+            },
+            "examples": {
+              "service-unavailable": {
+                "$ref": "#/components/examples/service-unavailable"
+              }
+            }
+          }
+        }
+      },
+      "get-current-user-success": {
+        "description": "成功获取当前用户信息",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/UserResponse"
+            },
+            "examples": {
+              "user-all-response": {
+                "$ref": "#/components/examples/user-all-response"
+              }
+            }
+          }
+        }
+      },
+      "list-models-success": {
+        "description": "成功获取模型列表",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ModelListResponse"
+            },
+            "examples": {
+              "list-models-response": {
+                "$ref": "#/components/examples/list-models-response"
+              }
+            }
+          }
+        }
+      },
+      "get-model-success": {
+        "description": "成功获取模型详情",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ModelDetailResponse"
+            },
+            "examples": {
+              "get-model-response": {
+                "$ref": "#/components/examples/get-model-response"
+              }
+            }
+          }
+        }
+      },
+      "list-datasets-success": {
+        "description": "成功获取数据集列表",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/DatasetListResponse"
+            },
+            "examples": {
+              "list-datasets-response": {
+                "$ref": "#/components/examples/list-datasets-response"
+              }
+            }
+          }
+        }
+      },
+      "get-dataset-success": {
+        "description": "成功获取数据集详情",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/DatasetDetailResponse"
+            },
+            "examples": {
+              "get-dataset-response": {
+                "$ref": "#/components/examples/get-dataset-response"
+              }
+            }
+          }
+        }
+      },
+      "list-mcp-servers-success": {
+        "description": "成功获取MCP服务列表",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/McpServerListResponse"
+            },
+            "examples": {
+              "list-mcp-servers-response": {
+                "$ref": "#/components/examples/list-mcp-servers-response"
+              }
+            }
+          }
+        }
+      },
+      "list-operational-mcp-servers-success": {
+        "description": "成功获取用户托管MCP服务列表",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/McpServerOperationalListResponse"
+            }
+          }
+        }
+      },
+      "get-mcp-server-success": {
+        "description": "成功获取MCP服务详情",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/McpServerDetailResponse"
+            },
+            "examples": {
+              "get-mcp-server-response": {
+                "$ref": "#/components/examples/get-mcp-server-response"
+              }
+            }
+          }
+        }
+      },
+      "deploy-mcp-server-success": {
+        "description": "成功部署MCP服务",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/McpDeployResponse"
+            },
+            "examples": {
+              "deploy-mcp-server-response": {
+                "$ref": "#/components/examples/deploy-mcp-server-response"
+              }
+            }
+          }
+        }
+      },
+      "undeploy-mcp-server-success": {
+        "description": "成功解除MCP服务部署",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/McpUndeployResponse"
+            }
+          }
+        }
+      }
+    },
+    "securitySchemes": {
+      "bearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "description": "ModelScope API Token"
+      }
+    },
+    "parameters": {
+      "owner": {
+        "name": "owner",
+        "in": "path",
+        "description": "仓库 owner（组织或个人）",
+        "required": true,
+        "schema": {
+          "type": "string",
+          "minLength": 1,
+          "examples": [
+            "OpenDataLab",
+            "Qwen",
+            "iic"
+          ]
+        }
+      },
+      "repo_name": {
+        "name": "repo_name",
+        "in": "path",
+        "description": "仓库 repo_name 名称",
+        "required": true,
+        "schema": {
+          "type": "string",
+          "minLength": 1,
+          "examples": [
+            "AICC",
+            "Qwen-Image-Edit-2511"
+          ]
+        }
+      },
+      "mcp_server_id": {
+        "name": "id",
+        "in": "path",
+        "description": "服务ID。由平台后台收录的MCP，ID 默认为@author/server_name，当被社区用户认领后将会变更为user_name/server_name；由社区用户自发提交的MCP，ID 为user_name/server_name。",
+        "required": true,
+        "schema": {
+          "type": "string",
+          "examples": [
+            "@modelcontextprotocol/fetch",
+            "username/server-name"
+          ]
+        }
+      }
+    },
+    "examples": {
+      "user-all-response": {
+        "value": {
+          "success": true,
+          "data": {
+            "username": "tester",
+            "nickname": "测试用户",
+            "description": "这是一个测试用户",
+            "email": "test@modelscope.cn",
+            "avatar_url": "https://resouces.modelscope.cn/avatar/516aa51f-5fb7-49eb-930c-e90500ae13ca.png"
+          },
+          "request_id": "4d3f4b7d-95be-4e6f-95eb-d75178375bd2"
+        }
+      },
+      "get-dataset-response": {
+        "value": {
+          "success": true,
+          "request_id": "4d3f4b7d-95be-4e6f-95eb-d75178375bd3",
+          "data": {
+            "id": "OpenDataLab/AICC",
+            "display_name": "AICC",
+            "description": "",
+            "file_size": 0,
+            "downloads": 12119,
+            "likes": 7,
+            "license": "cc-by-4.0",
+            "tasks": [],
+            "created_at": "2025-11-25T14:30:22Z",
+            "last_modified": "2026-01-01T00:31:42Z",
+            "tags": [
+              "license:cc-by-4.0",
+              "custom_tag:common-crawl",
+              "custom_tag:code",
+              "custom_tag:markdown",
+              "custom_tag:math",
+              "custom_tag:html-parsing"
+            ],
+            "private": false,
+            "gated": false,
+            "login_required": false,
+            "readme": "hello"
+          }
+        }
+      },
+      "get-model-response": {
+        "value": {
+          "success": true,
+          "request_id": "4d3f4b7d-95be-4e6f-95eb-d75178375bd3",
+          "data": {
+            "id": "Qwen/Qwen-Image-Edit-2511",
+            "display_name": "Qwen-Image-Edit-2511",
+            "description": "",
+            "downloads": 20175,
+            "likes": 149,
+            "license": "apache-2.0",
+            "tasks": [
+              "image-to-image"
+            ],
+            "created_at": "2025-12-18T01:32:15Z",
+            "last_modified": "2025-12-23T14:09:52Z",
+            "file_size": 57720465119,
+            "params": 0,
+            "tags": [
+              "license:apache-2.0",
+              "library:pytorch",
+              "library:safetensors",
+              "library:diffusers",
+              "task:image-to-image"
+            ],
+            "private": false,
+            "gated": false,
+            "readme": "hello"
+          }
+        }
+      },
+      "list-datasets-response": {
+        "value": {
+          "success": true,
+          "request_id": "4d3f4b7d-95be-4e6f-95eb-d75178375bd3",
+          "data": {
+            "datasets": [
+              {
+                "id": "DAMO_NLP/jd",
+                "display_name": "商品评论情感预测",
+                "description": "该数据集包含从2011年1月1日到2014年3月31日（3年多）某电商网站的消费者购买行为，用户评分，评论和产品元数据，涵盖15个一级产品类别，987个二级产品类别，近2个百万用户，超过10万种产品和超过6,000万条评论。该数据集中的每个文本评论都包含三个子评论：正面评论，负面评论和整体评论。",
+                "file_size": 0,
+                "downloads": 53996,
+                "likes": 102,
+                "license": "Apache License 2.0",
+                "tasks": [
+                  "text-classification"
+                ],
+                "created_at": "2022-09-28T06:30:31Z",
+                "last_modified": "2022-10-30T03:36:39Z",
+                "tags": [
+                  "license:Apache License 2.0",
+                  "task:text-classification"
+                ],
+                "private": false,
+                "gated": false,
+                "login_required": false
+              },
+              {
+                "id": "iic/nlp_domain_classification_chinese_testset",
+                "display_name": "中文文本领域分类测试集",
+                "description": "中文文本领域分类测试集，涉及国民经济行业标准的18个行业，部分收集自公开数据",
+                "file_size": 0,
+                "downloads": 2401,
+                "likes": 23,
+                "license": "Apache License 2.0",
+                "tasks": [
+                  "text-classification"
+                ],
+                "created_at": "2023-02-06T09:21:21Z",
+                "last_modified": "2024-09-02T15:16:35Z",
+                "tags": [
+                  "license:Apache License 2.0",
+                  "task:text-classification",
+                  "custom_tag:文本领域",
+                  "custom_tag:领域",
+                  "custom_tag:文本分类"
+                ],
+                "private": false,
+                "gated": false,
+                "login_required": false
+              }
+            ],
+            "total_count": 60,
+            "page_number": 1,
+            "page_size": 2
+          }
+        }
+      },
+      "list-models-response": {
+        "value": {
+          "success": true,
+          "request_id": "4d3f4b7d-95be-4e6f-95eb-d75178375bd3",
+          "data": {
+            "models": [
+              {
+                "id": "iic/QwenLong-L1.5-30B-A3B",
+                "display_name": "QwenLong-L1.5-30B-A3B",
+                "description": "",
+                "downloads": 1466,
+                "likes": 25,
+                "license": "apache-2.0",
+                "tasks": [
+                  "text-generation"
+                ],
+                "created_at": "2025-12-14T12:26:15Z",
+                "last_modified": "2025-12-16T03:34:26Z",
+                "file_size": 61081671123,
+                "params": 30532122624,
+                "tags": [
+                  "license:apache-2.0",
+                  "model_type:qwen3_moe",
+                  "library:transformer",
+                  "library:safetensors",
+                  "library:pytorch",
+                  "task:text-generation",
+                  "deploy:swingdeploy"
+                ],
+                "private": false,
+                "gated": false
+              },
+              {
+                "id": "ZhipuAI/AutoGLM-Phone-9B",
+                "display_name": "AutoGLM-Phone-9B",
+                "description": "",
+                "downloads": 28525,
+                "likes": 265,
+                "license": "MIT License",
+                "tasks": [
+                  "image-captioning"
+                ],
+                "created_at": "2025-12-08T08:00:28Z",
+                "last_modified": "2025-12-09T15:22:57Z",
+                "file_size": 20605693975,
+                "params": 5368163840,
+                "tags": [
+                  "license:MIT License",
+                  "model_type:glm4v",
+                  "library:safetensors",
+                  "library:pytorch",
+                  "task:image-captioning",
+                  "deploy:swingdeploy"
+                ],
+                "private": false,
+                "gated": false
+              }
+            ],
+            "total_count": 43127,
+            "page_number": 1,
+            "page_size": 2
+          }
+        }
+      },
+      "list-mcp-servers-response": {
+        "value": {
+          "success": true,
+          "data": {
+            "mcp_server_list": [
+              {
+                "id": "@modelcontextprotocol/fetch",
+                "name": "Fetch网页内容抓取",
+                "chinese_name": "Fetch网页内容抓取",
+                "description": "该服务器使大型语言模型能够检索和处理网页内容...",
+                "logo_url": "https://resources.modelscope.cn/...",
+                "publisher": "@modelcontextprotocol/fetch",
+                "categories": [
+                  "browser-automation"
+                ],
+                "tags": [
+                  "browser-automation"
+                ],
+                "view_count": 30667,
+                "locales": {
+                  "zh": {
+                    "name": "Fetch网页内容抓取",
+                    "description": "该服务器使大型语言模型能够检索和处理网页内容..."
+                  },
+                  "en": {
+                    "name": "Fetch",
+                    "description": "A server that enables LLMs to retrieve and process web content..."
+                  }
+                }
+              }
+            ],
+            "total_count": 1
+          },
+          "message": "success",
+          "request_id": "c55709d2-4e09-4bd8-be84-d8518bc46363"
+        }
+      },
+      "get-mcp-server-response": {
+        "value": {
+          "success": true,
+          "data": {
+            "id": "@modelcontextprotocol/fetch",
+            "name": "Fetch网页内容抓取",
+            "chinese_name": "Fetch网页内容抓取",
+            "description": "该服务器使大型语言模型能够检索和处理网页内容...",
+            "logo_url": "https://resources.modelscope.cn/mcp-cover-img/...",
+            "publisher": "@modelcontextprotocol/fetch",
+            "author": "modelcontextprotocol",
+            "owner": "",
+            "readme": "# Fetch MCP Server...",
+            "source_url": "https://github.com/modelcontextprotocol/...",
+            "github_stars": 1234,
+            "is_hosted": true,
+            "is_verified": true,
+            "categories": [
+              "browser-automation"
+            ],
+            "tags": [
+              "browser-automation"
+            ],
+            "view_count": 30667,
+            "env_schema": {},
+            "server_config": [],
+            "operational_urls": []
+          },
+          "message": "success",
+          "request_id": "c55709d2-4e09-4bd8-be84-d8518bc46363"
+        }
+      },
+      "deploy-mcp-server-response": {
+        "value": {
+          "success": true,
+          "data": {
+            "id": "platform-pool",
+            "url": "https://mcp.api-inference.modelscope.net/xxxx/mcp",
+            "transport_type": "streamable_http",
+            "auth_required": false,
+            "expiration": "2025-10-01 21:00:00"
+          },
+          "message": "success",
+          "request_id": "c55709d2-4e09-4bd8-be84-d8518bc46363"
+        }
+      },
+      "invalid-authentication": {
+        "value": {
+          "success": false,
+          "code": "InvalidAuthentication",
+          "message": "Invalid authentication, please check your Authorization header",
+          "request_id": "4d3f4b7d-95be-4e6f-95eb-d75178375bd3"
+        }
+      },
+      "resource-not-found": {
+        "value": {
+          "success": false,
+          "code": "ResourceNotFound",
+          "message": "Resource not found",
+          "request_id": "4d3f4b7d-95be-4e6f-95eb-d75178375bd5"
+        }
+      },
+      "internal-server-error": {
+        "value": {
+          "success": false,
+          "code": "InternalServerError",
+          "message": "Internal server error: database connection failed",
+          "request_id": "4d3f4b7d-95be-4e6f-95eb-d75178375bd8"
+        }
+      },
+      "service-unavailable": {
+        "value": {
+          "success": false,
+          "code": "ServiceUnavailable",
+          "message": "Service unavailable: model inference service is down",
+          "request_id": "4d3f4b7d-95be-4e6f-95eb-d75178375bd9"
+        }
+      }
+    }
+  }
+}

@@ -6,20 +6,26 @@ from mrt.sources.modelscope import ModelScopeOrgModelsSource
 
 @dataclass
 class FakeHttp:
-    html: str
+    responses: dict[str, HttpResponse]
 
     def get(self, url: str, *, headers=None) -> HttpResponse:  # noqa: ANN001
-        return HttpResponse(status=200, url=url, headers={}, body=self.html.encode("utf-8"))
+        if url in self.responses:
+            return self.responses[url]
+        raise KeyError(url)
 
 
-def test_detects_new_models_by_href() -> None:
-    html = """
-    <html>
-      <a href="/models/deepseek-ai/DeepSeek-R1">x</a>
-      <a href="/models/deepseek-ai/DeepSeek-V2">y</a>
-    </html>
-    """
-    src = ModelScopeOrgModelsSource(org="deepseek-ai", http=FakeHttp(html=html))
+def test_detects_new_models_via_openapi_list() -> None:
+    url = (
+        "https://modelscope.cn/openapi/v1/models?owner=deepseek-ai&sort=last_modified&page_number=1&page_size=50"
+    )
+    body = (
+        '{"success":true,"request_id":"r","data":{"models":['
+        '{"id":"deepseek-ai/DeepSeek-R1","tasks":["text-generation"],"last_modified":"2026-02-10T00:00:10Z"},'
+        '{"id":"deepseek-ai/DeepSeek-V2","tasks":[],"last_modified":"2026-02-10T00:00:11Z"}'
+        '],"total_count":2,"page_number":1,"page_size":50}}'
+    )
+    http = FakeHttp(responses={url: HttpResponse(status=200, url=url, headers={}, body=body.encode("utf-8"))})
+    src = ModelScopeOrgModelsSource(org="deepseek-ai", http=http)
 
     r1 = src.poll(cursor=None)
     assert len(r1.events) == 2
