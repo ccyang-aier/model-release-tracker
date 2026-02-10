@@ -41,7 +41,7 @@ class HttpClient:
         user_agent: str = "model-release-tracker/0",
         max_retries: int = 3,
         base_backoff_seconds: float = 0.8,
-        verify_ssl: bool = True,
+        verify_ssl: bool = False,
     ) -> None:
         self._timeout_seconds = timeout_seconds
         self._user_agent = user_agent

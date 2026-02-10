@@ -166,18 +166,13 @@ def local_welink_server() -> dict[str, Any]:
         server.server_close()
 
 
-def test_live_poll_generates_events_and_posts_to_welink(local_welink_server: dict[str, Any]) -> None:
+def test_live_poll_huggingface_posts_to_welink(local_welink_server: dict[str, Any]) -> None:
     """
-    真实端到端集成测试（严格语义，不允许跳过）：
+    真实端到端集成测试：
     - 上游：真实访问 HuggingFace Hub API（若网络/代理不通，测试应失败）
     - 下游：真实 HTTP POST 到本地模拟 WeLink server（必须收到请求且字段合规）
     - 幂等链路：alerts/seen_events/cursors 必须真实落库
     """
-    try:
-        with socket.create_connection(("huggingface.co", 443), timeout=2.0):
-            pass
-    except OSError as e:
-        pytest.skip(f"network unreachable for huggingface.co: {type(e).__name__}: {e}")
     with tempfile.TemporaryDirectory() as td:
         db_path = f"{td}/state.sqlite3"
         store = SqliteStateStore(db_path)
@@ -236,12 +231,6 @@ def test_live_poll_generates_events_and_posts_to_welink(local_welink_server: dic
 
 
 def test_live_poll_github_issues_posts_to_welink(local_welink_server: dict[str, Any]) -> None:
-    try:
-        with socket.create_connection(("api.github.com", 443), timeout=2.0):
-            pass
-    except OSError as e:
-        pytest.skip(f"network unreachable for api.github.com: {type(e).__name__}: {e}")
-
     token = os.environ.get("GITHUB_TOKEN")
     if not token:
         pytest.skip("set GITHUB_TOKEN to run live GitHub integration test")
@@ -283,12 +272,6 @@ def test_live_poll_github_issues_posts_to_welink(local_welink_server: dict[str, 
 
 
 def test_live_poll_modelscope_posts_to_welink(local_welink_server: dict[str, Any]) -> None:
-    try:
-        with socket.create_connection(("modelscope.cn", 443), timeout=2.0):
-            pass
-    except OSError as e:
-        pytest.skip(f"network unreachable for modelscope.cn: {type(e).__name__}: {e}")
-
     with tempfile.TemporaryDirectory() as td:
         db_path = f"{td}/state.sqlite3"
         store = SqliteStateStore(db_path)

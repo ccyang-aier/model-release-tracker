@@ -13,11 +13,18 @@ Model Release Tracker（MRT）用于以“轮询”的方式持续监控多个�
 
 ## 2. 快速开始（端到端示例）
 
-### 2.1 准备环境变量（建议只用环境变量放密钥）
+### 2.1 准备环境变量（强烈建议只用环境变量放密钥）
 
-GitHub（可选但强烈建议）：
+MRT 的配置里用的是 `*_env` 字段：它们表示“环境变量名”，而不是密钥/URL 本身。
 
-- `GITHUB_TOKEN`：GitHub Personal Access Token，用于提升限流配额
+例如：
+
+- `token_env: "GITHUB_TOKEN"` 表示去读取环境变量 `GITHUB_TOKEN` 的值作为 GitHub token
+- `webhook_env: "WELINK_WEBHOOK_URL"` 表示去读取环境变量 `WELINK_WEBHOOK_URL` 的值作为 WeLink webhook URL
+
+GitHub（可选但强烈建议配置，否则容易遇到 403 rate limit）：
+
+- `GITHUB_TOKEN`：GitHub token，用于提升限流配额
 
 WeLink（可选）：
 
@@ -27,6 +34,14 @@ WeLink（可选）：
 HuggingFace（可选）：
 
 - `HF_TOKEN`：访问 HuggingFace 的 token（若只访问公开信息可不配置）
+
+在 Linux / bash 中可这样设置（注意不要把 token 写进 JSON 配置文件，也不要在命令行历史里泄露）：
+
+```bash
+export GITHUB_TOKEN="ghp_xxx"
+export WELINK_WEBHOOK_URL="https://open.welink.huaweicloud.com/api/werobot/v1/webhook/send?token=xxx&channel=standard"
+export HF_TOKEN="hf_xxx"
+```
 
 ### 2.2 编写配置文件（JSON）
 
@@ -63,7 +78,7 @@ HuggingFace（可选）：
 
 ```bash
 source $(conda info --base)/etc/profile.d/conda.sh
-conda activate sparsev12
+conda activate box
 
 PYTHONPATH=src python -m mrt --config /path/to/config.json --once
 ```
@@ -98,7 +113,8 @@ PYTHONPATH=src python -m mrt --config /path/to/config.json --daemon
 - `monitor.pulls`（bool，可选，默认 true）
   - 是否监控 Pull Requests
 - `token_env`（string，可选）
-  - GitHub Token 的环境变量名；若为空则匿名访问（更易触发 429 限流）
+  - GitHub token 的环境变量名；若为空则匿名访问（更易触发 403 rate limit exceeded）
+  - 典型写法：`"token_env": "GITHUB_TOKEN"`，并在运行前 `export GITHUB_TOKEN="..."` 或通过进程环境注入
 
 ### 3.3 sources.huggingface
 
@@ -118,7 +134,7 @@ PYTHONPATH=src python -m mrt --config /path/to/config.json --daemon
 ### 3.5 notify.welink
 
 - `webhook_env`（string，可选，默认 `WELINK_WEBHOOK_URL`）
-  - WeLink webhook URL 的环境变量名
+  - WeLink webhook URL 的环境变量名（不是 URL 本身）
   - URL 需要包含 `token` 与 `channel` 参数，例如：
     - `https://open.welink.huaweicloud.com/api/werobot/v1/webhook/send?token=xxx&channel=standard`
 - `is_at`（bool，可选，默认：当 `at_accounts` 非空时为 true，否则 false）
@@ -146,11 +162,22 @@ PYTHONPATH=src python -m mrt --config /path/to/config.json --daemon
 
 ## 4. 常见问题
 
+### 4.0 配置文件里应该写 notifiers 还是 notify？
+
+配置文件使用 `notify` 作为顶层 key（见 [config.py](file:///mnt/c/AIWorks/AICode/projects/model-release-tracker/src/mrt/config.py#L145-L231) 的 JSON 结构约定）。启动日志里打印的是 runner 里“实际装配出来的 notifiers 列表”，这两个词容易混淆。
+
 ### 4.1 为什么不会重复告警？
 
 每条事件都会生成 fingerprint（幂等键），并写入 SQLite 的 `seen_events` 表。即使进程重启或重复拉取到相同事件，也会因为 fingerprint 已存在而跳过发送。
 
-### 4.2 如何验证 WeLink webhook 正常？
+### 4.2 为什么 GitHub 会报 403: rate limit exceeded？
+
+常见原因是 GitHub token 没有生效，程序退化成匿名访问（配额更低）。请检查：
+
+- 配置里 `sources.github.token_env` 写的是环境变量名（例如 `GITHUB_TOKEN`），而不是 token 本身
+- 运行进程的环境中确实存在该环境变量（例如 `echo "$GITHUB_TOKEN"` 有值）
+- token 仍然有效且未过期
+
+### 4.3 如何验证 WeLink webhook 正常？
 
 优先用 docs/welink-webhook-usecase.md 中的 curl 示例验证 webhook 本身可用，然后再配置到 MRT，通过 `--once` 运行观察群内是否收到消息。
-

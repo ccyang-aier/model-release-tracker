@@ -349,8 +349,7 @@ def build_runner(config: AppConfig) -> Runner:
     - 统一在这里做“配置 -> 实例”的装配，Runner 内只关注流程编排
     - 对 secret/token 只通过环境变量读取，避免落盘
     """
-    verify_ssl = os.environ.get("MRT_HTTP_VERIFY_SSL", "1").strip().lower() not in ("0", "false", "no", "off")
-    http = HttpClient(verify_ssl=verify_ssl)
+    http = HttpClient(verify_ssl=False)
     state = SqliteStateStore(config.sqlite_path)
 
     sources: list[object] = []
