@@ -49,6 +49,10 @@ class HttpClient:
         self._base_backoff_seconds = base_backoff_seconds
         self._ssl_context = ssl.create_default_context() if verify_ssl else ssl._create_unverified_context()
 
+    @property
+    def ssl_context(self) -> ssl.SSLContext:
+        return self._ssl_context
+
     def get(self, url: str, *, headers: Mapping[str, str] | None = None) -> HttpResponse:
         request_headers = {"User-Agent": self._user_agent}
         if headers:

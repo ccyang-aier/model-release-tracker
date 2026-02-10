@@ -78,6 +78,23 @@ def test_send_checks_response_code(monkeypatch: pytest.MonkeyPatch) -> None:
         notifier.send(alert=mock.Mock(content="hi"))  # type: ignore[arg-type]
 
 
+def test_send_passes_ssl_context(monkeypatch: pytest.MonkeyPatch) -> None:
+    captured = {}
+
+    def _fake_urlopen(*_a, **kwargs):  # noqa: ANN001
+        captured.update(kwargs)
+        ok_body = json.dumps({"code": "0", "data": "success", "message": "ok"}).encode("utf-8")
+        return _FakeResponse(status=200, body=ok_body)
+
+    monkeypatch.setattr("urllib.request.urlopen", _fake_urlopen)
+    notifier = WeLinkNotifier(
+        webhook_url="https://open.welink.huaweicloud.com/api/werobot/v1/webhook/send?token=x&channel=standard",
+        http=object(),
+    )
+    notifier.send(alert=mock.Mock(content="hi"))  # type: ignore[arg-type]
+    assert "context" in captured
+
+
 def test_text_is_truncated_to_500_chars() -> None:
     notifier = WeLinkNotifier(
         webhook_url="https://open.welink.huaweicloud.com/api/werobot/v1/webhook/send?token=x&channel=standard",

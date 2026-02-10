@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import ssl
 import time
 import uuid
 from dataclasses import dataclass
@@ -38,6 +39,10 @@ class WeLinkNotifier(Notifier):
         # 使用 GET-only 的 HttpClient 不适合发 POST，这里用标准库直接发起。
         import urllib.request
 
+        ssl_context = getattr(self.http, "ssl_context", None)
+        if not isinstance(ssl_context, ssl.SSLContext):
+            ssl_context = ssl._create_unverified_context()
+
         req = urllib.request.Request(
             url=self.webhook_url,
             data=data,
@@ -48,7 +53,7 @@ class WeLinkNotifier(Notifier):
             },
             method="POST",
         )
-        with urllib.request.urlopen(req, timeout=20) as resp:  # noqa: S310
+        with urllib.request.urlopen(req, timeout=20, context=ssl_context) as resp:  # noqa: S310
             status = getattr(resp, "status", 200)
             body = resp.read()
             if status >= 400:

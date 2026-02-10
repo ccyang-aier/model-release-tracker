@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Any, Mapping
+from typing import Any, Iterator, Mapping
 
 from ..http_utils import HttpClient, parse_link_header, with_query_params
 from ..models import TrackerEvent, parse_rfc3339_datetime, utc_now
@@ -48,22 +48,28 @@ class _GitHubBase:
             headers["Authorization"] = f"Bearer {self.token}"
         return headers
 
-    def _get_json_pages(self, url: str) -> list[tuple[list[Mapping[str, Any]], Mapping[str, str]]]:
-        pages: list[tuple[list[Mapping[str, Any]], Mapping[str, str]]] = []
+    def _iter_json_pages(
+        self, url: str, *, max_pages: int | None = None
+    ) -> Iterator[tuple[list[Mapping[str, Any]], Mapping[str, str]]]:
         next_url: str | None = url
+        pages = 0
         while next_url:
             resp = self.http.get(next_url, headers=self._headers())
             data = resp.json()
             if not isinstance(data, list):
                 raise ValueError(f"GitHub API expected list, got {type(data)}: {resp.url}")
             items: list[Mapping[str, Any]] = [x for x in data if isinstance(x, dict)]
-            pages.append((items, resp.headers))
+            yield items, resp.headers
+
+            pages += 1
+            if max_pages is not None and pages >= max_pages:
+                break
+
             link = resp.headers.get("Link") or resp.headers.get("link")
             if not link:
                 break
             links = parse_link_header(link)
             next_url = links.get("next")
-        return pages
 
 
 @dataclass(slots=True)
@@ -93,7 +99,8 @@ class GitHubRepoIssuesSource(_GitHubBase):
         newest_updated_at: datetime | None = updated_after
         events: list[TrackerEvent] = []
 
-        for items, _headers in self._get_json_pages(url):
+        max_pages = 1 if updated_after is None else None
+        for items, _headers in self._iter_json_pages(url, max_pages=max_pages):
             for it in items:
                 if "pull_request" in it:
                     continue
@@ -160,14 +167,17 @@ class GitHubRepoPullsSource(_GitHubBase):
         newest_updated_at: datetime | None = updated_after
         events: list[TrackerEvent] = []
 
-        for items, _headers in self._get_json_pages(url):
+        max_pages = 1 if updated_after is None else None
+        reached_cutoff = False
+        for items, _headers in self._iter_json_pages(url, max_pages=max_pages):
             for it in items:
                 updated_at_s = it.get("updated_at")
                 if not isinstance(updated_at_s, str):
                     continue
                 updated_at = parse_rfc3339_datetime(updated_at_s)
                 if updated_after is not None and updated_at <= updated_after:
-                    continue
+                    reached_cutoff = True
+                    break
                 if newest_updated_at is None or updated_at > newest_updated_at:
                     newest_updated_at = updated_at
 
@@ -198,7 +208,8 @@ class GitHubRepoPullsSource(_GitHubBase):
                         raw=it,
                     )
                 )
+            if reached_cutoff and updated_after is not None:
+                break
 
         new_cursor = _encode_cursor(newest_updated_at) if newest_updated_at is not None else cursor
         return PollResult(events=events, new_cursor=new_cursor)
-
