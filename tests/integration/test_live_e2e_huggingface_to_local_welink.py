@@ -164,6 +164,11 @@ def test_live_poll_generates_events_and_posts_to_welink(local_welink_server: dic
     - 下游：真实 HTTP POST 到本地模拟 WeLink server（必须收到请求且字段合规）
     - 幂等链路：alerts/seen_events/cursors 必须真实落库
     """
+    try:
+        with socket.create_connection(("huggingface.co", 443), timeout=2.0):
+            pass
+    except OSError as e:
+        pytest.skip(f"network unreachable for huggingface.co: {type(e).__name__}: {e}")
     with tempfile.TemporaryDirectory() as td:
         db_path = f"{td}/state.sqlite3"
         store = SqliteStateStore(db_path)
@@ -185,7 +190,10 @@ def test_live_poll_generates_events_and_posts_to_welink(local_welink_server: dic
         )
 
         runner = Runner(state=store, sources=sources, matcher=matcher, notifiers=notifiers)
-        runner.run_once()
+        report = runner.run_once()
+        assert report.source_errors == 0, "; ".join(
+            f"{s.source_key}({s.source_type}): {s.error}" for s in report.sources if s.error
+        )
 
         conn = sqlite3.connect(db_path)
         try:

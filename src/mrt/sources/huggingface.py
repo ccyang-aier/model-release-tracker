@@ -67,10 +67,22 @@ class HuggingFaceOrgModelsSource:
         next_url: str | None = url
         while next_url:
             resp = self.http.get(next_url, headers=self._headers())
-            data = resp.json()
+            try:
+                data = resp.json()
+            except Exception as e:  # noqa: BLE001
+                body_prefix = resp.text()[:400]
+                raise ValueError(
+                    f"HuggingFace API invalid JSON: status={resp.status} url={resp.url} body_prefix={body_prefix!r}"
+                ) from e
+            if isinstance(data, dict) and isinstance(data.get("models"), list):
+                data = data["models"]
             if not isinstance(data, list):
-                raise ValueError(f"HuggingFace API expected list, got {type(data)}: {resp.url}")
+                body_prefix = resp.text()[:400]
+                raise ValueError(
+                    f"HuggingFace API expected list, got {type(data)}: status={resp.status} url={resp.url} body_prefix={body_prefix!r}"
+                )
 
+            reached_old = False
             for it in data:
                 if not isinstance(it, dict):
                     continue
@@ -79,7 +91,8 @@ class HuggingFaceOrgModelsSource:
                     continue
                 last_modified = parse_rfc3339_datetime(last_modified_s)
                 if last_modified_after is not None and last_modified <= last_modified_after:
-                    continue
+                    reached_old = True
+                    break
 
                 if newest_last_modified is None or last_modified > newest_last_modified:
                     newest_last_modified = last_modified
@@ -110,6 +123,9 @@ class HuggingFaceOrgModelsSource:
                     )
                 )
 
+            if reached_old:
+                break
+
             link = resp.headers.get("Link") or resp.headers.get("link")
             if not link:
                 break
@@ -118,4 +134,3 @@ class HuggingFaceOrgModelsSource:
 
         new_cursor = _encode_cursor(newest_last_modified) if newest_last_modified is not None else cursor
         return PollResult(events=events, new_cursor=new_cursor)
-
