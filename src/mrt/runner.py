@@ -205,7 +205,7 @@ class Runner:
                 notify_successes += r.notify_successes
                 notify_failures += r.notify_failures
 
-            if result.new_cursor is not None:
+            if result.new_cursor is not None and notify_failures == 0:
                 self.state.set_cursor(source_key, result.new_cursor)
 
             source_reports.append(
@@ -329,7 +329,8 @@ class Runner:
                     event.url,
                 )
 
-        self.state.mark_seen(fp)
+        if notify_failures == 0:
+            self.state.mark_seen(fp)
         return _ProcessEventReport(
             processed=True,
             skipped_seen=False,

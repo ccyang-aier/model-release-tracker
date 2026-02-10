@@ -57,9 +57,15 @@ def test_notify_failure_is_recorded(tmp_path, caplog) -> None:  # noqa: ANN001
     )
 
     caplog.set_level(logging.ERROR)
-    report = runner.run_once()
-    assert report.notify_failures == 1
+    report1 = runner.run_once()
+    assert report1.notify_failures == 1
     assert "notify failed" in caplog.text
+    fp = event.fingerprint()
+    assert store.has_seen(fp) is False
+    assert store.get_cursor("s1") is None
+
+    report2 = runner.run_once()
+    assert report2.notify_failures == 1
 
     conn = sqlite3.connect(str(db))
     try:
@@ -67,4 +73,4 @@ def test_notify_failure_is_recorded(tmp_path, caplog) -> None:  # noqa: ANN001
     finally:
         conn.close()
 
-    assert row[0] == 1
+    assert row[0] == 2
