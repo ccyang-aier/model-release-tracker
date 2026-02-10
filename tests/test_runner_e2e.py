@@ -1,6 +1,8 @@
 from dataclasses import dataclass
 from datetime import UTC, datetime
 
+import logging
+
 from mrt.models import Alert, TrackerEvent
 from mrt.rules.matcher import RuleMatcher
 from mrt.runner import Runner
@@ -75,9 +77,45 @@ def test_runner_dedupe_and_cursor(tmp_path) -> None:  # noqa: ANN001
         notifiers=(notifier,),
     )
 
-    runner.run_once()
+    report1 = runner.run_once()
     assert len(notifier.sent) == 1
     assert store.get_cursor("s1") == "c1"
+    assert report1.events_fetched == 1
+    assert report1.events_processed == 1
+    assert report1.events_matched == 1
+    assert report1.alerts_created == 1
+    assert report1.notify_attempts == 1
+    assert report1.notify_successes == 1
+    assert report1.notify_failures == 0
 
-    runner.run_once()
+    report2 = runner.run_once()
     assert len(notifier.sent) == 1
+    assert report2.events_fetched == 1
+    assert report2.events_processed == 1
+    assert report2.events_skipped_seen == 1
+    assert report2.alerts_created == 0
+
+
+@dataclass
+class _FailingSource:
+    def key(self) -> str:
+        return "boom"
+
+    def poll(self, cursor: str | None) -> PollResult:  # noqa: ARG002
+        raise RuntimeError("poll failed")
+
+
+def test_runner_source_poll_exception_is_caught(tmp_path, caplog) -> None:  # noqa: ANN001
+    db = tmp_path / "state.sqlite3"
+    store = SqliteStateStore(str(db))
+    runner = Runner(
+        state=store,
+        sources=(_FailingSource(),),
+        matcher=RuleMatcher(keywords=("deepseek",)),
+        notifiers=(),
+    )
+
+    caplog.set_level(logging.ERROR)
+    report = runner.run_once()
+    assert report.source_errors == 1
+    assert "source poll failed" in caplog.text

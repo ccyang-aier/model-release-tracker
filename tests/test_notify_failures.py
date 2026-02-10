@@ -2,6 +2,8 @@ import sqlite3
 from dataclasses import dataclass
 from datetime import UTC, datetime
 
+import logging
+
 from mrt.models import Alert, TrackerEvent
 from mrt.rules.matcher import RuleMatcher
 from mrt.runner import Runner
@@ -28,7 +30,7 @@ class _FailingNotifier:
     def send(self, alert: Alert) -> None:  # noqa: ARG002
         raise RuntimeError("boom")
 
-def test_notify_failure_is_recorded(tmp_path) -> None:  # noqa: ANN001
+def test_notify_failure_is_recorded(tmp_path, caplog) -> None:  # noqa: ANN001
     t = datetime(2026, 2, 10, 0, 0, tzinfo=UTC)
     event = TrackerEvent(
         source="github",
@@ -53,7 +55,10 @@ def test_notify_failure_is_recorded(tmp_path) -> None:  # noqa: ANN001
         notifiers=(_FailingNotifier(),),
     )
 
-    runner.run_once()
+    caplog.set_level(logging.ERROR)
+    report = runner.run_once()
+    assert report.notify_failures == 1
+    assert "notify failed" in caplog.text
 
     conn = sqlite3.connect(str(db))
     try:
